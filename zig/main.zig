@@ -1,9 +1,7 @@
 const std = @import("std");
-var allocator = std.heap.c_allocator;
 const Post = struct { _id: []const u8, title: []const u8, tags: [][]const u8 };
 const Posts = []Post;
 const TopPosts = struct { _id: *const []const u8, tags: *const [][]const u8, related: []*Post };
-const stdout = std.io.getStdOut().writer();
 const fxhash = @import("fxhash.zig");
 
 const Score = struct {
@@ -52,9 +50,14 @@ inline fn top5(related: []*Post, score: []u8, ps: []Post) void {
 }
 
 pub fn main() !void {
+    var allocator = std.heap.page_allocator;
+
     const file = try std.fs.cwd().openFile("../posts.json", .{});
     defer file.close();
-    var json_reader = std.json.reader(allocator, file.reader());
+    var file_buffer: [4096]u8 = undefined;
+    var file_reader = file.reader(&file_buffer);
+    const io_reader = &file_reader.interface;
+    var json_reader = std.json.Reader.init(allocator, io_reader);
     defer json_reader.deinit();
     const parsed = try std.json.parseFromTokenSource(Posts, allocator, &json_reader, .{});
     defer parsed.deinit();
@@ -69,10 +72,10 @@ pub fn main() !void {
         for (post_ele.tags) |tag| {
             const get_or_put = try map.getOrPut(tag);
             if (get_or_put.found_existing) {
-                try get_or_put.value_ptr.*.append(@intCast(i));
+                try get_or_put.value_ptr.*.append(allocator, @intCast(i));
             } else {
-                var temp = ArrPosts.init(allocator);
-                try temp.append(@intCast(i));
+                var temp = ArrPosts.empty;
+                try temp.append(allocator, @intCast(i));
                 get_or_put.value_ptr.* = temp;
             }
         }
@@ -80,7 +83,7 @@ pub fn main() !void {
 
     var op = try std.ArrayList(TopPosts).initCapacity(allocator, parsed.value.len);
     op.expandToCapacity();
-    defer op.deinit();
+    defer op.deinit(allocator);
 
     var rl: []*Post = try allocator.alloc(*Post, parsed.value.len * 5);
     defer allocator.free(rl);
@@ -105,11 +108,24 @@ pub fn main() !void {
         op.items[post_index] = .{ ._id = &parsed.value[post_index]._id, .tags = &parsed.value[post_index].tags, .related = related };
     }
     const end = try std.time.Instant.now();
-    try stdout.print("Processing time (w/o IO): {d}ms\n", .{@divFloor(end.since(start), std.time.ns_per_ms)});
+
+    var stdout_buffer: [4096]u8 = undefined;
+    var stdout = std.fs.File.writer(std.fs.File.stdout(), &stdout_buffer);
+
+    try stdout.interface.print("Processing time (w/o IO): {d}ms\n", .{@divFloor(end.since(start), std.time.ns_per_ms)});
+    try stdout.interface.flush();
 
     const op_file = try std.fs.cwd().createFile("../related_posts_zig.json", .{});
     defer op_file.close();
-    var buffered_writer = std.io.bufferedWriter(op_file.writer());
-    try std.json.stringify(try op.toOwnedSlice(), .{}, buffered_writer.writer());
-    try buffered_writer.flush();
+
+    var buf: [4096]u8 = undefined;
+    var writer = std.fs.File.writer(op_file, &buf);
+
+    try std.json.Stringify.value(
+        try op.toOwnedSlice(allocator),
+        .{},
+        &writer.interface,
+    );
+
+    try writer.interface.flush();
 }

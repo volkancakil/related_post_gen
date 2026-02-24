@@ -1,1 +1,1 @@
-RUN pacman -S --noconfirm --needed leiningen
+RUN pacman -Syu --noconfirm --needed leiningen

@@ -73,6 +73,14 @@ run_command() {
     fi
 }
 
+run_ada() {
+    echo "Running Ada" &&
+        cd ./ada &&
+        alr build --release &&
+        run_command "Ada" $runs ./bin/main &&
+        check_output "related_posts_ada.json"
+}
+
 run_go() {
     echo "Running Go" &&
         cd ./go &&
@@ -124,6 +132,14 @@ run_rust_con() {
         run_command "Rust Concurrent" $runs ./target/release/rust_rayon &&
         check_output "related_posts_rust_con.json"
 
+}
+
+run_rust_ho() {
+    echo "Running Rust HO" &&
+        cd ./rust_ho &&
+        cargo build --release &&
+        run_command "Rust HO" $runs ./target/release/rust_ho &&
+        check_output "related_posts_rust_ho.json"
 }
 
 run_python() {
@@ -212,6 +228,17 @@ run_zig() {
         check_output "related_posts_zig.json"
 }
 
+run_zig_fast() {
+    echo "Running Zig Fast" &&
+        cd ./zig &&
+        if [ -z "$appendToFile" ]; then # only build on 5k run
+            zig build-exe -lc -O ReleaseFast main.zig
+        fi &&
+        run_command "Zig Fast" $runs ./main &&
+        check_output "related_posts_zig.json"
+}
+
+
 run_zig_con() {
     echo "Running Zig" &&
         cd ./zig_con &&
@@ -221,6 +248,18 @@ run_zig_con() {
         run_command "Zig Concurrent" $runs ./main &&
         check_output "related_posts_zig_con.json"
 }
+
+
+run_zig_con_fast() {
+    echo "Running Zig" &&
+        cd ./zig_con &&
+        if [ -z "$appendToFile" ]; then # only build on 5k run
+            zig build-exe -O ReleaseFast main.zig
+        fi &&
+        run_command "Zig Concurrent" $runs ./main &&
+        check_output "related_posts_zig_con.json"
+}
+
 
 run_julia() {
     echo "Running Julia" &&
@@ -404,7 +443,7 @@ run_fsharp() {
             dotnet restore &&
                 dotnet publish -c release
         fi &&
-        run_command "F# (JIT)" $runs ./bin/release/net9.0/fsharp_jit &&
+        run_command "F# (JIT)" $runs ./bin/release/net10.0/fsharp_jit &&
         cd .. &&
         check_output "related_posts_fsharp_jit.json"
 }
@@ -414,9 +453,9 @@ run_fsharp_aot() {
         cd ./fsharp/aot &&
         if [ -z "$appendToFile" ]; then # only build on 5k run
             dotnet restore &&
-                dotnet publish -c release --self-contained -p PublishAot=true -o "bin/release/net9.0/aot"
+                dotnet publish -c release --self-contained -p PublishAot=true -o "bin/release/net10.0/aot"
         fi &&
-        run_command "F# (AOT)" $runs ./bin/release/net9.0/aot/fsharp_aot &&
+        run_command "F# (AOT)" $runs ./bin/release/net10.0/aot/fsharp_aot &&
         cd .. &&
         check_output "related_posts_fsharp_aot.json"
 }
@@ -428,7 +467,7 @@ run_fsharp_con() {
             dotnet restore &&
                 dotnet publish -c release
         fi &&
-        run_command "F# Concurrent" $runs ./bin/release/net9.0/fsharp_con &&
+        run_command "F# Concurrent" $runs ./bin/release/net10.0/fsharp_con &&
         check_output "related_posts_fsharp_con.json"
 }
 
@@ -437,9 +476,9 @@ run_fsharp_con_aot() {
         cd ./fsharp_con &&
         if [ -z "$appendToFile" ]; then # subsequent runs
             dotnet restore &&
-                dotnet publish -c release --self-contained -p PublishAot=true -o "bin/release/net9.0/aot"
+                dotnet publish -c release --self-contained -p PublishAot=true -o "bin/release/net10.0/aot"
         fi &&
-        run_command "F# Concurrent (AOT)" $runs ./bin/release/net9.0/aot/fsharp_con &&
+        run_command "F# Concurrent (AOT)" $runs ./bin/release/net10.0/aot/fsharp_con &&
         check_output "related_posts_fsharp_con.json"
 }
 
@@ -447,9 +486,9 @@ run_csharp() {
     echo "Running CSharp (JIT)" &&
         cd ./csharp &&
         if [ -z "$appendToFile" ]; then # subsequent runs
-            dotnet publish -c release --self-contained -o "bin/release/net9.0/jit"
+            dotnet publish -c release --self-contained -o "bin/release/net10.0/jit"
         fi &&
-        run_command "C# (JIT)" $runs ./bin/release/net9.0/jit/related &&
+        run_command "C# (JIT)" $runs ./bin/release/net10.0/jit/related &&
         check_output "related_posts_csharp.json"
 }
 
@@ -457,9 +496,9 @@ run_csharp_aot() {
     echo "Running CSharp (AOT)" &&
         cd ./csharp &&
         if [ -z "$appendToFile" ]; then # subsequent runs
-            dotnet publish -c release --self-contained -p PublishAot=true -o "bin/release/net9.0/aot"
+            dotnet publish -c release --self-contained -p PublishAot=true -o "bin/release/net10.0/aot"
         fi &&
-        run_command "C# (AOT)" $runs ./bin/release/net9.0/aot/related &&
+        run_command "C# (AOT)" $runs ./bin/release/net10.0/aot/related &&
         check_output "related_posts_csharp.json"
 }
 
@@ -467,9 +506,9 @@ run_csharp_con() {
     echo "Running CSharp Concurrent (JIT)" &&
         cd ./csharp_con &&
         if [ -z "$appendToFile" ]; then # subsequent runs
-            dotnet publish -c release --self-contained -o "bin/release/net9.0/jit"
+            dotnet publish -c release --self-contained -o "bin/release/net10.0/jit"
         fi &&
-        run_command "C# Concurrent (JIT)" $runs ./bin/release/net9.0/jit/related &&
+        run_command "C# Concurrent (JIT)" $runs ./bin/release/net10.0/jit/related &&
         check_output "related_posts_csharp_con.json"
 }
 
@@ -477,9 +516,9 @@ run_csharp_con_aot() {
     echo "Running CSharp Concurrent (AOT)" &&
         cd ./csharp_con &&
         if [ -z "$appendToFile" ]; then # subsequent runs
-            dotnet publish -c release --self-contained -p PublishAot=true -o "bin/release/net9.0/aot"
+            dotnet publish -c release --self-contained -p PublishAot=true -o "bin/release/net10.0/aot"
         fi &&
-        run_command "C# Concurrent (AOT)" 1 ./bin/release/net9.0/aot/related &&
+        run_command "C# Concurrent (AOT)" 1 ./bin/release/net10.0/aot/related &&
         check_output "related_posts_csharp_con.json"
 }
 
@@ -600,6 +639,13 @@ run_ruby() {
         cd ./ruby &&
         run_command "Ruby" $slow_lang_runs ruby related.rb &&
         check_output "related_posts_ruby.json"
+}
+
+run_php() {
+    echo "Running PHP" &&
+        cd ./php &&
+        run_command "PHP" $slow_lang_runs php ./related.php &&
+        check_output "related_posts_php.json"
 }
 
 run_dascript() {
@@ -732,6 +778,10 @@ elif [ "$first_arg" = "rust_con" ]; then
 
     run_rust_con
 
+elif [ "$first_arg" = "rust_ho" ]; then
+
+    run_rust_ho
+
 elif [ "$first_arg" = "py" ]; then
 
     run_python
@@ -760,9 +810,17 @@ elif [ "$first_arg" = "zig" ]; then
 
     run_zig
 
+elif [ "$first_arg" = "zig_fast" ]; then
+
+    run_zig_fast
+
 elif [ "$first_arg" = "zig_con" ]; then
 
     run_zig_con
+
+elif [ "$first_arg" = "zig_con_fast" ]; then
+
+    run_zig_con_fast
 
 elif [ "$first_arg" = "julia" ]; then
 
@@ -936,6 +994,10 @@ elif [ "$first_arg" = "ruby" ]; then
 
     run_ruby
 
+elif [ "$first_arg" = "php" ]; then
+
+    run_php
+
 elif [ "$first_arg" = "dascript" ]; then
 
     run_dascript
@@ -972,6 +1034,10 @@ elif [ "$first_arg" = "neat" ]; then
 
     run_neat
 
+elif [ "$first_arg" = "ada" ]; then
+
+    run_ada
+
 elif [ "$first_arg" = "all" ]; then
 
     echo -e "Running all\n" &&
@@ -993,7 +1059,9 @@ elif [ "$first_arg" = "all" ]; then
         # run_python_numba || echo -e "\n" && break rules but very interesting
         run_crystal || echo -e "\n" &&
         run_zig || echo -e "\n" &&
+        run_zig_fast || echo -e "\n" &&
         run_zig_con || echo -e "\n" &&
+        run_zig_con_fast || echo -e "\n" &&
         run_julia || echo -e "\n" &&
         run_julia_highly_optimized || echo -e "\n" &&
         run_julia_con || echo -e "\n" &&
@@ -1027,6 +1095,7 @@ elif [ "$first_arg" = "all" ]; then
         run_ocaml || echo -e "\n" &&
         run_erlang || echo -e "\n" &&
         # run_ruby || echo -e "\n" && # too slow
+        run_php || echo -e "\n" &&
         # run_dascript || echo -e "\n" && #not installed in docker
         run_racket || echo -e "\n" &&
         run_typed_racket || echo -e "\n" &&
@@ -1081,6 +1150,6 @@ elif [ "$first_arg" = "clean" ]; then
 
 else
 
-    echo "Valid args: go | go_con | rust | rust_con | d | d_con | r | py | numpy | erlang | cl | numba | numba_con | cr | zig | zig_con | odin | c3 | jq | julia | julia_highly_optimized | julia_con | v | dart | swift | swift_con | node | bun | deno | java | java_graal | java_graal_con | nim | luajit | lua | fsharp | fsharp_aot | fsharp_con | csharp | csharp_aot | dascript | all | clean. Unknown argument: $first_arg"
+    echo "Valid args: go | go_con | rust | rust_con | d | d_con | r | py | numpy | erlang | cl | numba | numba_con | cr | zig_fast | zig_con | odin | c3 | jq | julia | julia_highly_optimized | julia_con | v | dart | swift | swift_con | node | bun | deno | java | java_graal | java_graal_con | nim | luajit | lua | fsharp | fsharp_aot | fsharp_con | csharp | csharp_aot | | php | dascript | all | clean. Unknown argument: $first_arg"
 
 fi

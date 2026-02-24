@@ -72,6 +72,11 @@ jobs:
               with:
                   deno-version: v1.x
 
+            - name: Install PHP
+              uses: shivammathur/setup-php@v2
+              with:
+                php-version: '8.5'
+
             - name: Install Java
               uses: actions/setup-java@v3.9.0
               with:

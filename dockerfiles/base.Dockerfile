@@ -26,11 +26,11 @@ VOLUME /results
 # you token that will be used to authenticate your fork
 ENV GIT_PAT=""
 
-ENV GIT_USER="jinyus"
-ENV GIT_EMAIL="jinyus@users.noreply.github.com"
+ENV GIT_USER="zupat"
+ENV GIT_EMAIL="zupat@users.noreply.github.com"
 
 # the repo that will be clone. Most likely your fork
-ENV GIT_REPO="https://github.com/jinyus/related_post_gen.git"
+ENV GIT_REPO="https://github.com/zupat/related_post_gen.git"
 
 # incase you use a different name for your fork
 ENV GIT_REPO_NAME="related_post_gen"

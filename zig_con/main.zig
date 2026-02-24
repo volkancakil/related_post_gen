@@ -1,8 +1,8 @@
 const std = @import("std");
 const json = std.json;
 const ArrayList = std.ArrayList;
-const StringHashMap = std.StringHashMap;
 const Thread = std.Thread;
+const fxhash = @import("./fxhash.zig");
 
 const TopN = 5;
 const PostIdx = u32;
@@ -21,26 +21,39 @@ const RelatedPosts = struct {
 };
 
 pub fn main() !void {
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
+    const allocator = std.heap.smp_allocator;
 
     const posts_json = try std.fs.cwd().readFileAlloc(allocator, "../posts.json", std.math.maxInt(usize));
     var posts = try json.parseFromSlice([]Post, allocator, posts_json, .{});
     defer posts.deinit();
 
+    var thread_pool: Thread.Pool = undefined;
+    const cpu_count = try std.Thread.getCpuCount();
+    const worker_count: usize = if (cpu_count > 1) cpu_count - 1 else 1;
+    try thread_pool.init(.{ .allocator = allocator, .n_jobs = worker_count });
+    defer thread_pool.deinit();
+
     const start_time = std.time.nanoTimestamp();
-    const related_posts = try genRelatedPosts(allocator, posts.value);
+    const related_posts = try genRelatedPosts(allocator, posts.value, &thread_pool, worker_count);
     const duration = std.time.nanoTimestamp() - start_time;
 
     std.debug.print("Processing time (w/o IO): {d:.3}ms\n", .{@as(f64, @floatFromInt(duration)) / 1_000_000.0});
 
     var file = try std.fs.cwd().createFile("../related_posts_zig_con.json", .{});
     defer file.close();
-    try json.stringify(related_posts, .{}, file.writer());
+
+    var buf: [4096]u8 = undefined;
+    var writer = std.fs.File.writer(file, &buf);
+    try json.Stringify.value(related_posts, .{}, &writer.interface);
+    try writer.interface.flush();
 }
 
-fn genRelatedPosts(allocator: std.mem.Allocator, posts: []const Post) ![]RelatedPosts {
+fn genRelatedPosts(
+    allocator: std.mem.Allocator,
+    posts: []const Post,
+    thread_pool: *Thread.Pool,
+    worker_count: usize,
+) ![]RelatedPosts {
     const Chunk = @Vector(64, SharedCount);
     const SharedCountAndIndex = struct {
         count: SharedCount,
@@ -50,11 +63,11 @@ fn genRelatedPosts(allocator: std.mem.Allocator, posts: []const Post) ![]Related
     const post_count = posts.len;
     const related_posts = try allocator.alloc(RelatedPosts, post_count);
 
-    var tag_to_post_idxs = StringHashMap(ArrayList(usize)).init(allocator);
+    var tag_to_post_idxs = fxhash.StringHashMap(ArrayList(usize)).init(allocator);
     defer {
         var it = tag_to_post_idxs.iterator();
         while (it.next()) |entry| {
-            entry.value_ptr.deinit();
+            entry.value_ptr.deinit(allocator);
         }
         tag_to_post_idxs.deinit();
     }
@@ -63,20 +76,16 @@ fn genRelatedPosts(allocator: std.mem.Allocator, posts: []const Post) ![]Related
         for (post.tags) |tag| {
             var entry = try tag_to_post_idxs.getOrPut(tag);
             if (!entry.found_existing) {
-                entry.value_ptr.* = ArrayList(usize).init(allocator);
+                entry.value_ptr.* = ArrayList(usize).empty;
             }
-            try entry.value_ptr.append(post_idx);
+            try entry.value_ptr.append(allocator, post_idx);
         }
     }
-
-    var thread_pool: Thread.Pool = undefined;
-    try thread_pool.init(.{ .allocator = allocator });
-    defer thread_pool.deinit();
 
     const WorkContext = struct {
         posts: []const Post,
         related_posts: []RelatedPosts,
-        tag_to_post_idxs: *StringHashMap(ArrayList(usize)),
+        tag_to_post_idxs: *fxhash.StringHashMap(ArrayList(usize)),
         allocator: std.mem.Allocator,
     };
 
@@ -98,6 +107,7 @@ fn genRelatedPosts(allocator: std.mem.Allocator, posts: []const Post) ![]Related
 
             const chunks = ctx.allocator.alloc(Chunk, (ctx.posts.len + 63) / 64) catch return;
             defer ctx.allocator.free(chunks);
+            @memset(chunks, @splat(0));
             var counts = @as([*]SharedCount, @ptrCast(chunks.ptr))[0..ctx.posts.len];
 
             while (post_idx >= 0) : (post_idx = atomic_cd.fetchSub(1, .monotonic) - 1) {
@@ -120,7 +130,9 @@ fn genRelatedPosts(allocator: std.mem.Allocator, posts: []const Post) ![]Related
                     const something_above_threshold = @reduce(.Or, chunk > vthreshold);
                     if (something_above_threshold) {
                         const base_idx = 64 * chunk_idx;
-                        for (0..64) |sub_idx| {
+                        const remaining = ctx.posts.len - base_idx;
+                        const sub_limit: usize = if (remaining < 64) remaining else 64;
+                        for (0..sub_limit) |sub_idx| {
                             const count = chunk[sub_idx];
                             if (count <= threshold) continue;
                             const newest = SharedCountAndIndex{ .count = count, .related_post_index = @intCast(base_idx + sub_idx) };
@@ -152,10 +164,11 @@ fn genRelatedPosts(allocator: std.mem.Allocator, posts: []const Post) ![]Related
         }
     };
 
-    thread_pool.spawn(worker.work, .{ &context, &atomic_countdown }) catch |err| {
-        std.debug.print("Error spawning thread: {}\n", .{err});
-        return err;
-    };
+    var wg: std.Thread.WaitGroup = .{};
+    for (0..worker_count) |_| {
+        thread_pool.spawnWg(&wg, worker.work, .{ &context, &atomic_countdown });
+    }
+    thread_pool.waitAndWork(&wg);
 
     return related_posts;
 }

@@ -1,1 +1,1 @@
-RUN pacman -S --noconfirm --needed racket
+RUN pacman -Syu --noconfirm --needed racket

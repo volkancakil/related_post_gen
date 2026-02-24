@@ -9,6 +9,7 @@ declare -A NameToImage=(
     ["cpp_con"]="base"
     ["rust"]="rust"
     ["rust_con"]="rust"
+    ["rust_ho"]="rust"
     ["py"]="base"
     ["numba"]="base"
     ["numba_con"]="base"
@@ -57,12 +58,15 @@ declare -A NameToImage=(
     ["cl"]="lisp"
     ["clj"]="clojure"
     ["ruby"]="ruby"
+    ["php"]="php"
     ["racket"]="racket"
     ["typed_racket"]="racket"
     ["lobster"]="lobster"
     ["scala_native"]="java"
     ["inko"]="inko"
     ["neat"]="neat"
+    ["ada"]="ada"
+
 )
 
 TEST_NAME="$1"
